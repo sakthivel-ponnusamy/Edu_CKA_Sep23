@@ -186,7 +186,7 @@ sudo kubeadm config images pull
 
 #sudo kubeadm init --pod-network-cidr=10.244.0.0/16
 
-sudo kubeadm init --pod-network-cidr=10.244.0.0/16 --ignore-preflight-errors=NumCPU --ignore-preflight-errors=Mem
+sudo kubeadm init --pod-network-cidr=10.206.0.0/16 --ignore-preflight-errors=NumCPU --ignore-preflight-errors=Mem
 
 #The initialization may take a few moments to finish. Expect an output similar to the following:
 
@@ -218,23 +218,22 @@ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 #sudo chown $(id -u):$(id -g) $HOME/.kube/config
 #export KUBECONFIG=/etc/kubernetes/admin.conf
 
+#Run below to see that the control plane is not ready, because we have not yet installed CNI
+kubectl get nodes -o wide
+
 #Deploy a pod network to our cluster. This is required to interconnect the different Kubernetes components.
-
-kubectl apply -f https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
-
-
-#Expect an output like this:
-
-#podsecuritypolicy.policy/psp.flannel.unprivileged created
-#clusterrole.rbac.authorization.k8s.io/flannel created
-#clusterrolebinding.rbac.authorization.k8s.io/flannel created
-#serviceaccount/flannel created
-#configmap/kube-flannel-cfg created
-#daemonset.apps/kube-flannel-ds created
+#Flannel do not support Network Policy and Ingress
+#kubectl apply -f https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
+#Install Calico
+	kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.3/manifests/tigera-operator.yaml
+	curl https://raw.githubusercontent.com/projectcalico/calico/v3.27.3/manifests/custom-resources.yaml -O
+	#Edit the yaml to mention our POD network CIDR
+	vi custom-resources.yaml
+	kubectl create -f custom-resources.yaml
 
 #Use the get nodes command to verify that our master node is ready.
 
-kubectl get nodes
+kubectl get nodes -o wide
 
 #Also check whether all the default pods are running:
 
