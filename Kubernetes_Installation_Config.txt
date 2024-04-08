@@ -189,6 +189,11 @@ sudo kubeadm config images pull
 
 sudo kubeadm init --pod-network-cidr=10.206.0.0/16 --ignore-preflight-errors=NumCPU --ignore-preflight-errors=Mem
 
+#Check the kubeadm config file (Just FYI)
+kubectl -n kube-system get cm kubeadm-config -o yaml
+#Check the kubelet config file  (Just FYI)
+kubectl -n kube-system get cm kubelet-config -o yaml
+
 #The initialization may take a few moments to finish. Expect an output similar to the following:
 
 #Your Kubernetes control-plane has initialized successfully!
