@@ -143,9 +143,11 @@ kubectl -n kube-system get cm kubelet-config -o yaml
 kubectl get nodes -o wide
 
 #Deploy a pod network to our cluster. This is required to interconnect the different Kubernetes components.
-#Flannel do not support Network Policy and Ingress
-	#kubectl apply -f https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
-#Install Calico
+#Install Flannel (do not support Network Policy and Ingress)
+	curl https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml -O
+	vi kube-flannel.yml --> Change the "Network": "10.244.0.0/16" to "Network": "<same as --pod-network-cidr in kubeadm>"
+	kubectl apply -f kube-flannel.yml
+#Install Calico (Faced an issue of DNS resolving from the worker node PODs)
 	kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.3/manifests/tigera-operator.yaml
 	curl https://raw.githubusercontent.com/projectcalico/calico/v3.27.3/manifests/custom-resources.yaml -O
 	#Edit the yaml to mention our POD network CIDR
