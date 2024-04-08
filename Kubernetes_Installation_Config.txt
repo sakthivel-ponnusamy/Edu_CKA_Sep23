@@ -166,6 +166,7 @@ metadata:
   name: dnsutils
   namespace: default
 spec:
+  nodeName: k-master
   containers:
   - name: dnsutils
     image: registry.k8s.io/e2e-test-images/jessie-dnsutils:1.3
@@ -199,4 +200,23 @@ NAME          STATUS   ROLES                  AGE     VERSION
 master-node   Ready    control-plane,master   5m12s   v1.24.1
 worker-node   Ready    worker                 2m55s   v1.24.1
 
+#Check whether the DNS lookup is working from the PODs running from the worker node
+#First, create the POD
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dnsutils-worker
+  namespace: default
+spec:
+  containers:
+  - name: dnsutils
+    image: registry.k8s.io/e2e-test-images/jessie-dnsutils:1.3
+    command:
+      - sleep
+      - "infinity"
+    imagePullPolicy: IfNotPresent
+  restartPolicy: Always
 
+#Second run below to check
+kubectl exec -it pod/dnsutils-worker -- nslookup kubernetes.default
+kubectl exec -it pod/dnsutils-worker -- nslookup www.google.com
