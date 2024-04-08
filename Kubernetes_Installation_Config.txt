@@ -71,6 +71,7 @@ sudo sysctl --system
 #Install curl.
 
 sudo apt install curl -y
+sudo apt-get install -y apt-transport-https ca-certificates curl
 
 #Get the apt-key and then add the repository from which we will install containerd.
 
