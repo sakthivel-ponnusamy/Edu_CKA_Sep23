@@ -79,6 +79,7 @@ sudo apt-mark hold kubelet kubeadm kubectl docker.io
 sudo mkdir /etc/containerd
 sudo containerd config default > /etc/containerd/config.toml
 sudo sed -i 's/            SystemdCgroup = false/            SystemdCgroup = true/' /etc/containerd/config.toml
+cat /etc/containerd/config.toml | grep -i systemdcgroup
 sudo systemctl restart containerd
 sudo systemctl restart kubelet
 
@@ -114,19 +115,11 @@ sudo systemctl enable kubelet
 #With our container runtime and Kubernetes modules installed, we are ready to initialize our Kubernetes cluster.
 
 #Run the following command on the master node to allow Kubernetes to fetch the required images before cluster initialization:
-
 sudo kubeadm config images pull
 
-#Initialize the cluster
-
+#Initialize the cluster (CONTROL PLANE)
 #sudo kubeadm init --pod-network-cidr=10.244.0.0/16
-
 sudo kubeadm init --pod-network-cidr=10.206.0.0/16 --ignore-preflight-errors=NumCPU --ignore-preflight-errors=Mem
-
-#Check the kubeadm config file (Just FYI)
-kubectl -n kube-system get cm kubeadm-config -o yaml
-#Check the kubelet config file  (Just FYI)
-kubectl -n kube-system get cm kubelet-config -o yaml
 
 #The initialization may take a few moments to finish. Expect an output similar to the following:
 
@@ -137,14 +130,10 @@ mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
-#Alternatively, if you are the root user, you can run:
-
-#export KUBECONFIG=/etc/kubernetes/admin.conf
-#You should now deploy a pod network to the cluster. Run kubectl apply -f [podnetwork].yaml with one of the options listed at Kubernetes.
-#Then you can join any number of worker nodes by running the following on each as root:
-
-#kubeadm join 102.130.122.60:6443 --token s3v1c6.dgufsxikpbn9kflf \
-        --discovery-token-ca-cert-hash sha256:b8c63b1aba43ba228c9eb63133df81632a07dc780a92ae2bc5ae101ada623e00
+#Check the kubeadm config file (Just FYI)
+kubectl -n kube-system get cm kubeadm-config -o yaml
+#Check the kubelet config file  (Just FYI)
+kubectl -n kube-system get cm kubelet-config -o yaml
 
 #You will see a kubeadm join at the end of the output. Copy and save it in some file. We will have to run this command on the worker node to allow it to join the cluster. If you forget to save it, or misplace it, you can also regenerate it using this command:
 
@@ -155,7 +144,7 @@ kubectl get nodes -o wide
 
 #Deploy a pod network to our cluster. This is required to interconnect the different Kubernetes components.
 #Flannel do not support Network Policy and Ingress
-#kubectl apply -f https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
+	#kubectl apply -f https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
 #Install Calico
 	kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.3/manifests/tigera-operator.yaml
 	curl https://raw.githubusercontent.com/projectcalico/calico/v3.27.3/manifests/custom-resources.yaml -O
@@ -169,28 +158,38 @@ kubectl get nodes -o wide
 #Also check whether all the default pods are running:
 kubectl get pods --all-namespaces
 
+#Check whether the DNS lookup is working
+#First, create the POD
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dnsutils
+  namespace: default
+spec:
+  containers:
+  - name: dnsutils
+    image: registry.k8s.io/e2e-test-images/jessie-dnsutils:1.3
+    command:
+      - sleep
+      - "infinity"
+    imagePullPolicy: IfNotPresent
+  restartPolicy: Always
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+#Second run below to check
+kubectl exec -it pod/dnsutils -- nslookup kubernetes.default
+kubectl exec -it pod/dnsutils -- nslookup www.google.com
+
 #We are now ready to move to the worker node. Execute the kubeadm join from step 2 on the worker node. You should see an output similar to the following:
-
-#This node has joined the cluster:
-#* Certificate signing request was sent to apiserver and a response was received.
-#* The Kubelet was informed of the new secure connection details.
-#Run kubectl get nodes on the control-plane to see this node join the cluster.
-
-#If you go back to the master node, you should now be able to see the worker node in the output of the get nodes command.
-
-kubectl get nodes
-
-#And the output should look as follows:
-
-NAME          STATUS   ROLES                  AGE     VERSION
-master-node   Ready    control-plane,master   18m40s   v1.24.2
-worker-node   Ready    <none>                 3m2s     v1.24.2
-
-#Finally, to set the proper role for the worker node, run this command on the master node:
-
-kubectl label node worker-node node-role.kubernetes.io/worker=worker
-
-#To verify that the role was set:
+#Run below the command in master/control-plane node
+#sudo kubeadm token create --print-join-command
+#Run the printed command (as below) in the worker node
+kubeadm join 10.205.3.150:6443 --token oyotee.2razzjhjc1a9l9n8 \
+        --discovery-token-ca-cert-hash sha256:14b26591792fb9043dbe7c78f6575bc13ba8a787069fdf2753f804316ef76bc8
+#Label the worker node as worker
+kubectl label node k-worker1 node-role.kubernetes.io/worker=worker
 
 kubectl get nodes
 
@@ -201,13 +200,3 @@ master-node   Ready    control-plane,master   5m12s   v1.24.1
 worker-node   Ready    worker                 2m55s   v1.24.1
 
 
-#sudo kubeadm token create --print-join-command
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-###Only in Worker Nodes:
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Then you can join any number of worker nodes by running the following on each as root:
-
-kubeadm join 172.31.14.67:6443 --token 58fyu0.krr84io2uo84ory9 \
-        --discovery-token-ca-cert-hash sha256:d41674295c622b18fe641b412753a30c48144a402405a377bf41b74680cd84d0
